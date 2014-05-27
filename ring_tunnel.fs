@@ -45,5 +45,10 @@ void main()
 		float l=r*(fi*0.3+1.0)*2000.0-2800.0;
 		col+=spectral_colour(l)/(0.01*fi*fi*fi*fi+1.0);
 	}
-	gl_FragColor=vec4(pow(col,vec3(1.0/2.2)),1.0);
+    vec3 c = pow(col, vec3(1.0/2.2));
+    //if(c.x >0.0){
+        gl_FragColor=vec4(c,1.0);
+    //}else{
+    //    gl_FragColor = vec4(0., 0., 0., 0.);
+    //}
 }
