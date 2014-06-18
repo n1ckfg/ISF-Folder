@@ -32,7 +32,11 @@
 	],
 	"PASSES": [
 		{
-			"TARGET":"accum"
+			"TARGET":"accum",
+			"FLOAT": true
+		},
+		{
+		
 		}
 	]
 	
@@ -40,7 +44,11 @@
 
 void main()
 {
-	vec4		freshPixel = IMG_THIS_PIXEL(inputImage);
-	vec4		stalePixel = IMG_THIS_PIXEL(accum);
-	gl_FragColor = vec4(mix(freshPixel.r,stalePixel.r,rWeight), mix(freshPixel.g,stalePixel.g,gWeight), mix(freshPixel.b,stalePixel.b,bWeight), mix(freshPixel.a,stalePixel.a,aWeight));
+	if (PASSINDEX==0)	{
+		vec4		freshPixel = IMG_THIS_PIXEL(inputImage);
+		vec4		stalePixel = IMG_THIS_PIXEL(accum);
+		gl_FragColor = vec4(mix(freshPixel.r,stalePixel.r,rWeight), mix(freshPixel.g,stalePixel.g,gWeight), mix(freshPixel.b,stalePixel.b,bWeight), mix(freshPixel.a,stalePixel.a,aWeight));
+	}
+	else
+		gl_FragColor = IMG_THIS_PIXEL(accum);
 }

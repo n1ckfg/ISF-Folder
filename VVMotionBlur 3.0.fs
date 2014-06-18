@@ -20,7 +20,11 @@
 	],
 	"PASSES": [
 		{
-			"TARGET":"bufferVariableNameA"
+			"TARGET":"bufferVariableNameA",
+			"FLOAT": true
+		},
+		{
+		
 		}
 	]
 	
