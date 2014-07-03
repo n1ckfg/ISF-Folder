@@ -9,6 +9,7 @@
 			"TYPE": "image"
 		},
 		{
+			"LABEL": "Key Color",
 			"NAME": "mask_color",
 			"TYPE": "color",
 			"DEFAULT": [
@@ -19,46 +20,98 @@
 			]
 		},
 		{
-			"NAME": "hueTolerance",
+			"LABEL": "Show Alpha",
+			"NAME": "showAlpha",
+			"TYPE": "bool",
+			"DEFAULT": false
+		},
+		{
+			"LABEL": "HUE- Tol.",
+			"NAME": "hueTol",
 			"TYPE": "float",
 			"MIN": 0.0,
 			"MAX": 0.25,
-			"DEFAULT": 0.1
+			"DEFAULT": 0.0
 		},
 		{
-			"NAME": "satTolerance",
+			"LABEL": "HUE- Min. Bracket",
+			"NAME": "hueMinBracket",
 			"TYPE": "float",
 			"MIN": 0.0,
 			"MAX": 0.5,
-			"DEFAULT": 0.5
+			"DEFAULT": 0.25
 		},
 		{
-			"NAME": "valueTolerance",
+			"LABEL": "HUE- Max Bracket",
+			"NAME": "hueMaxBracket",
 			"TYPE": "float",
 			"MIN": 0.0,
 			"MAX": 0.5,
-			"DEFAULT": 0.5
+			"DEFAULT": 0.25
 		},
 		{
-			"NAME": "maskCutoff",
+			"LABEL": "SAT- Tol.",
+			"NAME": "satTol",
+			"TYPE": "float",
+			"MIN": 0.0,
+			"MAX": 0.5,
+			"DEFAULT": 0.0
+		},
+		{
+			"LABEL": "SAT- Min. Bracket",
+			"NAME": "satMinBracket",
 			"TYPE": "float",
 			"MIN": 0.0,
 			"MAX": 1.0,
 			"DEFAULT": 0.5
 		},
 		{
+			"LABEL": "SAT- Max Bracket",
+			"NAME": "satMaxBracket",
+			"TYPE": "float",
+			"MIN": 0.0,
+			"MAX": 1.0,
+			"DEFAULT": 0.5
+		},
+		{
+			"LABEL": "VAL- Tol.",
+			"NAME": "valTol",
+			"TYPE": "float",
+			"MIN": 0.0,
+			"MAX": 0.5,
+			"DEFAULT": 0.0
+		},
+		{
+			"LABEL": "VAL- Min. Bracket",
+			"NAME": "valMinBracket",
+			"TYPE": "float",
+			"MIN": 0.0,
+			"MAX": 1.0,
+			"DEFAULT": 0.5
+		},
+		{
+			"LABEL": "VAL- Max Bracket",
+			"NAME": "valMaxBracket",
+			"TYPE": "float",
+			"MIN": 0.0,
+			"MAX": 1.0,
+			"DEFAULT": 0.5
+		},
+		{
+			"LABEL": "Dilate",
 			"NAME": "dilate",
 			"TYPE": "float",
 			"MIN": 0.0,
 			"MAX": 6.0,
-			"DEFAULT": 2.0
+			"DEFAULT": 0.0
 		},
 		{
+			"LABEL": "Blur",
 			"NAME": "blur",
 			"TYPE": "float",
 			"MIN": 0.0,
 			"MAX": 6.0,
-			"DEFAULT": 2.0
+			"DEFAULT": 0.0
 		}
 	],
 	"PASSES": [
@@ -93,21 +146,90 @@ void main() {
 	vec4		src_rgb;
 	
 	if (PASSINDEX==0)	{
+		//	the goal is to calculate a new float value for the alpha channel, and/or desaturate the color, if this pixel is "close" to the mask color
 		//	get the src pixel's color (as RGB), convert to HSV values
 		src_rgb = IMG_PIXEL(inputImage, gl_FragCoord.xy);
-		vec3		src_hsl = rgb2hsv(src_rgb.rgb);
-		//	conver the passed color (which is RGB) to HSV values
-		vec3		color_hsl = rgb2hsv(mask_color.rgb);
+		vec3			src_hsl = rgb2hsv(src_rgb.rgb);
+		//	convert the passed color (which is RGB) to HSV values
+		vec3			color_hsl = rgb2hsv(mask_color.rgb);
 		
-		//	the goal is to calculate a new float value for the alpha channel
-		vec3		absDeltas = abs(src_hsl-color_hsl);
-		if (absDeltas.r<=hueTolerance && absDeltas.g<=satTolerance && absDeltas.b<=valueTolerance)	{
-			float		maxNormDelta = max(max(absDeltas.r/0.25, absDeltas.g/0.5), absDeltas.b/0.5);
-			maxNormDelta = smoothstep(maskCutoff, 1.0, maxNormDelta);
-			src_rgb.a = maxNormDelta;
+		
+/*			-minBracket	-tolerance	color_hsl	+tolerance	+maxBracket
+				|			|			|			|			|			val being examined
+		----------------------------------------------------------------
+				|						|						|			alpha
+				1.0						0.0						1.0									*/
+		
+		
+		float			hueAlpha;
+		float			satAlpha;
+		float			valAlpha;
+		//	use a 'for' loop to generate the hue/sat/val alpha values
+		int			i = 0;
+		float		source;
+		float		color;
+		float		tolerance;
+		vec2		bracket;
+		float		alpha;
+		float		min;
+		float		max;
+		for (i=0; i<3; ++i)	{
+			source = src_hsl[i];
+			color = color_hsl[i];
+			if (i==0)	{
+				tolerance = hueTol;
+				bracket = vec2(hueMinBracket, hueMaxBracket);
+			}
+			else if (i==1)	{
+				tolerance = satTol;
+				bracket = vec2(satMinBracket, satMaxBracket);
+			}
+			else if (i==2)	{
+				tolerance = valTol;
+				bracket = vec2(valMinBracket, valMaxBracket);
+			}
+			
+			//	if the source sat is < the mask color sat
+			if (source < color)	{
+				//	the min is the bracket and tolerance, the max is the mask color
+				min = color - tolerance - bracket.x;
+				max = color;
+				//	as i go from min to max, the alpha goes from 1 to 0
+				alpha = 1.0 - smoothstep(min, max, source);
+			}
+			//	else if the source sat is > the mask color sat
+			else if (source > color)	{
+				//	the min is the mask color, the max is the tolerance and bracket
+				min = color;
+				max = color + tolerance + bracket.y;
+				//	as i go from min to max, the alpha goes from 0 to 1
+				alpha = smoothstep(min, max, source);
+			}
+			//	else the source sat == the mask color sat, the alpha should be 0
+			else
+				alpha = 0.0;
+			
+			if (i==0)	{
+				hueAlpha = alpha;
+			}
+			else if (i==1)	{
+				satAlpha = alpha;
+			}
+			else if (i==2)	{
+				valAlpha = alpha;
+			}
 		}
-		else
-			src_rgb.a = 1.0;
+		
+		
+		//	calculate the alpha i'll be applying
+		src_rgb.a = sqrt(max(hueAlpha,max(satAlpha, valAlpha)));
+		
+		//	desaturate the color if appropriate, use the desaturated color
+		if (hueAlpha < 1.0)	{
+			//src_hsl.y = 0.0;
+			src_hsl.y = mix(0.0, src_hsl.y, hueAlpha);
+			src_rgb.rgb = hsv2rgb(src_hsl.xyz);
+		}
 		
 		
 		gl_FragColor = src_rgb;
@@ -192,7 +314,11 @@ void main() {
 				srcColor = tmpColor;
 		}
 		totalAlpha /= ((tmpRadius*2.)+1.);
-		gl_FragColor = vec4(srcColor.r, srcColor.g, srcColor.b, totalAlpha);
+		
+		if (showAlpha)
+			gl_FragColor = vec4(totalAlpha, totalAlpha, totalAlpha, 1.0);
+		else
+			gl_FragColor = vec4(srcColor.r, srcColor.g, srcColor.b, totalAlpha);
 	}
 }
 
